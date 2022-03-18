@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://charts.min.io/'
+    targetRevision: 3.6.2
+    helm:
+      values: |-
+        mode: standalone
+        existingSecret: minio-access-secret
+
+        persistence:
+          storageClass: freenas-nfs-csi
+          enabled: yes
+          size: 250Gi
+
+        resources:
+          requests:
+            memory: 512Mi
+
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+          - "minio.apps.gensokyo-cluster.lan"
+
+        consoleIngress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+          - "console.minio.apps.gensokyo-cluster.lan"
+
+        users:
+        - accessKey: minio
+          existingSecret: minio-access-secret
+          existingSecretKey: minioPassword
+          policy: readwrite
+
+        buckets:
+        - name: velero
+          policy: upload
+          purge: false
+    chart: minio
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: operations
+  syncPolicy:
+    automated:
+      prune: true
+      allowEmpty: true
+    syncOptions:
+    - CreateNamespace=true
+

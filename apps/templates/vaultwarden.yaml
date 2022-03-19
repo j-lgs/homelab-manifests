@@ -16,7 +16,7 @@ spec:
         - name: SIGNUPS_ALLOWED
           value: 'false'
         - name: DOMAIN
-          value: 'https://vaultwarden.chireiden.jlgs.me'
+          value: 'https://vaultwarden.jlgs.me'
         envFrom:
         - secretRef:
             name: admin-token-secret
@@ -32,10 +32,10 @@ spec:
               cert-manager.io/cluster-issuer: letsencrypt-production
             tls:
             - hosts:
-              - vaultwarden.chireiden.jlgs.me
+              - vaultwarden.jlgs.me
               secretName: vaultwarden-cert
             hosts:
-            - host: vaultwarden.chireiden.jlgs.me
+            - host: vaultwarden.jlgs.me
               paths:
               - path: /
                 pathType: Prefix

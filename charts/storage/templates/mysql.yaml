@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mysql
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://charts.bitnami.com/bitnami'
+    targetRevision: 8.8.27
+    helm:
+      values: |-
+        global:
+          storageClass: gensokyo-mayastor-singleton
+        primary:
+          persistence:
+            size: 8Gi
+        auth:
+          existingSecret: mysql-auth-secret
+        primary:
+          startupProbe:
+            periodSeconds: 60
+            timeoutSeconds: 360
+            initialDelaySeconds: 360
+            successThreshold: 1
+            failureThreshold: 10
+          extraVolumes:
+          - name: mysql-credentials
+            secret:
+              secretName: mysql-credentials-secret
+              optional: false
+              defaultMode: 0600
+          - name: database-credentials
+            secret:
+              secretName: database-credentials-secret
+              optional: false
+              defaultMode: 0600
+          extraVolumeMounts:
+          - name: mysql-credentials
+            mountPath: "/srv/secrets"
+            readOnly: true
+          - name: database-credentials
+            mountPath: "/srv/secrets/db"
+            readOnly: true
+    chart: mysql
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      allowEmpty: true
+    syncOptions:
+    - CreateNamespace=true
+

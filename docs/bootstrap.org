@@ -1,0 +1,173 @@
+* Bootstrapping the homelab
+** Misc notes
+*** Password generation
+    #+NAME: Password generation
+    #+BEGIN_SRC sh
+      openssl rand -base64 16
+      ansible-vault encrypt_string "$SECRET_STRING"
+      base64 < secret-raw-files/secret-file.ext | tr -d '\n' | ansible-vault encrypt_string
+    #+END_SRC
+** Machine provisioning
+*** Truenas
+**** Install proxmox backup server (moriya)
+     https://alan.norbauer.com/articles/pbs-on-truenas/#setup-prerequisites
+*** Proxmox cluster
+**** Cluster accounts
+     + admin, pam
+       Give user the Admin permission
+     + terraform@pve!terraform, api token, Terraform permission
+       Refer to https://registryn.terraform.io/providers/Telmate/proxmox/latest/docs
+**** Storage
+     + Disable "local"
+     + Add "pbs" as connection to existing proxmox backup server.
+     + NFS from truenas, named "truenas-pve" for bulk storage.
+       Setup script to download ltest PBS and talos releases to the storage.
+     + NFS from truenas, named "truenas-pve-vm" for VMs. On fastest dataset.
+**** Backup jobs
+     + \*/2:00 on all nodes to the "pbs" storage
+**** Hakugyokuro (Kubernetes Host)
+     Roles: Control plane and compute
+     Add wireguard kernel module
+     
+     apt install wireguard
+***** Provision VMs with terraform
+      #+NAME: Terraform Proxmox secrets
+      #+BEGIN_SRC sh
+	export PM_API_TOKEN_SECRET="$secret"
+	export PM_API_TOKEN_ID='terraform@pve!terraform'
+	terraform init
+	terraform plan
+        terraform apply
+      #+END_SRC
+** Kubernetes setup (Load balancer)
+   Apply the ansible playbook for provisioning the haproxy load balancer on proxmox.
+** Kubernetes setup (Talos)
+   #+NAME: Kubernetes setup
+   #+BEGIN_SRC sh
+     talosctl gen config gensokyo-cluster https://10.0.1.30:6443 --output-dir ./
+     talosctl --talosconfig talosconfig --endpoints 10.0.1.31 --nodes 10.0.1.31 bootstrap
+   #+END_SRC
+   Boot VMs up and apply the appropriate config (worker or controlplace) on each host.
+   #+BEGIN_SRC sh
+     talosctl apply-config --insecure --nodes 10.0.1.31 --file controlplane.yaml
+     talosctl apply-config --insecure --nodes 10.0.1.50 --file worker.yaml
+   #+END_SRC
+   Bootstrap kubernetes
+   #+NAME: Bootstrap kubernetes and get kubeconfig
+   #+BEGIN_SRC sh
+     talosctl bootstrap --talosconfig talosconfig -n 10.0.1.31
+     # Wait five or so minutes for kubernetes to bootstrap
+     talosctl --talosconfig talosconfig kubeconfig .
+   #+END_SRC
+** Service setup
+*** Bootstrap mayastor
+    Notes:
+    On unsuccessful deployment you must recreate the worker nodes.
+    #+NAME: Boostrap mayastor
+    #+BEGIN_SRC sh
+      ansible-playbook mayastor-bootstrap.yaml
+    #+END_SRC
+** Argo setup
+   Deploy argo, fork off the server and get the default admin secret.
+   #+BEGIN_SRC: sh
+     helm install --namespace argocd --create-namespace argo-cd argo-cd/argo-cd
+     kubectl -n argocd port-forward svc/argo-cd-argocd-server 8080:443 > /dev/null 2>&1 &
+     kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    #+END_SRC
+
+    
+    connect to http://127.0.0.1 and loging with crediential admin and $SECRET_FROM_PREV_STEP. Add a new login as desired.
+
+    Next step will apply all the argo manifests and the root manifest for argo. After this argo will set up all the apps as specified.
+    #+BEGIN_SRC: sh
+      helm template apps/ | kubectl apply -f -
+    #+END_SRC
+
+
+    kubeseal --format=yaml < secrets/gitea/gitea-database-secret.yaml  > apps/templates/secrets/gitea-database-secret.yaml
+    kubeseal --format=yaml < secrets/gitea/gitea-admin-secret.yaml  > apps/templates/secrets/gitea-admin-secret.yaml
+
+    kubeseal --format=yaml < secrets/mysql/gitea-credential-files-secret.yaml  > apps/templates/secrets/gitea-credential-files-secret.yaml
+    kubeseal --format=yaml < secrets/mysql/mysql-credential-files-secret.yaml  > apps/templates/secrets/mysql-credential-files-secret.yaml
+    kubeseal --format=yaml < secrets/mysql/mysql-auth-secret.yaml  > apps/templates/secrets/mysql-auth-secret.yaml
+
+    kubeseal --format=yaml < secrets/democratic-csi/democratic-csi-config-secret.yaml  > apps/templates/secrets/democratic-csi-config-secret.yaml
+
+    kubeseal --format=yaml < secrets/velero/cloud-credentials.yaml  > apps/templates/secrets/cloud-credentials.yaml
+    kubeseal --format=yaml < secrets/minio/minio-access-secret.yaml  > apps/templates/secrets/minio-access-secret.yaml
+
+    helm template apps/ | kubectl apply -f -
+*** Bootstrap mysql
+    To get a debug shell enter in this command:
+    #+NAME: Debug mysql
+    #+BEGIN_SRC sh
+      kubectl run mysql-client --rm --tty -i --restart='Never' --image  docker.io/bitnami/mysql:8.0.28-debian-10-r23 --namespace database --command -- bash
+      mysql -h mysql.database.svc.cluster.local -uroot -p"$MYSQL_ROOT_PASSWORD"
+    #+END_SRC
+
+    #+NAME: Delete release for debugging
+    #+BEGIN_SRC sh
+      helm delete mysql -n database
+      kubectl delete pvc -n database data-mysql-0
+    #+END_SRC
+
+    #+NAME: Run mysql bootstrap playbook
+    #+BEGIN_SRC sh
+      ansible-playbook mysql-bootstrap.yaml --ask-vault-pass
+    #+END_SRC
+
+    #+NAME: Get logs for mysql
+    #+BEGIN_SRC sh
+      kubectl -n database logs mysql-0
+    #+END_SRC
+
+    To get information on the current mysql instance run
+    #+NAME: Mysql status
+    #+BEGIN_SRC sh
+      helm -n mysql status mysql
+    #+END_SRC
+**** TODO Add section for recovering from a database dump/backup
+*** Bootstrap gitea
+    #+NAME: Run gitea Bootstrap playbook
+    #+BEGIN_SRC sh
+      ansible-playbook gitea-bootstrap.yaml --ask-vault-pass
+    #+END_SRC
+
+    To get information on the current gitea instance run
+    #+NAME: Gitea status
+    #+BEGIN_SRC sh
+      helm -n gitea status gitea
+    #+END_SRC
+
+    In the terminal run the following to port forward gitea's services. Then go to http://127.0.0.1:3000 to sign in.
+    #+BEGIN_SRC sh
+      kubectl --namespace gitea port-forward svc/gitea-http 3000:3000 > /dev/null 2>&1 &
+      kubectl --namespace gitea port-forward svc/gitea-ssh 3022:22 > /dev/null 2>&1 &
+    #+END_SRC
+
+    Sign in as the admin user and add a new user for yourself.
+    Then upload the git repository to it.
+
+    Remember to check jobs and stop when not needed
+    #+BEGIN_SRC sh
+      jobs -l
+      kill -9 $PID
+    #+END_SRC
+**** TODO Add section for recovering persistent data from a backup.
+**** TODO Add ansible playbook for generating and updating gitea's secrets.
+**** If bootstrapping from scratch (no backups)    
+    Add the new temporary origin and push the manifests to the new git repository
+    #+BEGIN_SRC sh
+      git remote add origin http://127.0.0.1:3000/ig/homelab-manifests.git
+      git push -u origin master
+    #+END_SRC
+** Bootstrap secrets
+   #+BEGIN_SRC: sh
+     # EG:
+     # kubectl kustomize secrets/gitea | ./seal.py > apps/templates/gitea-secrets.yaml
+
+     kubeseal --format=yaml < secrets/gitea/gitea-database-secret.yaml  > apps/templates/gitea-database-secret.yaml
+   #+END_SRC
+   Run the ansible playbook for encrypting the cluster's secrets and commiting them to the git repository.
+* How backups works
+  Velero backs up PVCs to minio running on the cluster with restic. minio's storage is backed by the democratic-csi storageclass.

@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+  name: upload-watcher
+  namespace: jobs
+spec:
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: upload-watcher
+            image: ghcr.io/j-lgs/upload-watcher:latest
+            env:
+            - name: BETANIN_INBOX
+              value: "/inbox"
+            - name: BETANIN_APIKEY
+              value: "ee921254e9dfdc922bee76d55b3bcc88"
+            - name: BETANIN_HOST
+              value: "http://betanin.svc.cluster.local/api/torrents"
+            volumeMounts:
+            - mountPath: /inbox
+              name: inbox-vol
+          restartPolicy: OnFailure
+          volumes:
+          - name: inbox-vol
+            nfs:
+              path: /mnt/rust2/media/music/inbox
+              server: 10.0.1.10
+  schedule: '*/5 * * * *'
+  successfulJobsHistoryLimit: 3

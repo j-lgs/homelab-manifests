@@ -1,0 +1,196 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: betanin
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: betanin-config
+  namespace: betanin
+data:
+  entrypoint.sh: |
+    #!/bin/sh
+    mkdir -p /b/.config/betanin
+    cp -f /cm/config.toml /b/.config/betanin/config.toml
+    mkdir -p /b/.config/beets
+    cp -f /cm/config.yaml /b/.config/beets/config.yaml
+  config.yaml: |
+    directory: /music
+    library: /b/.config/beets/musiclibrary.blb
+
+    plugins: embedart convert fetchart replaygain lastgenre chroma web
+
+    art_filename: albumart
+    threaded: yes
+
+    import:
+      copy: yes
+      write: yes
+      log: /b/.config/beets/beet.log
+      duplicate_action: remove
+      incremental: yes
+      resume: ask
+      incremental_skip_later: yes
+      timid: no
+      
+    paths:
+      default: Albums/$albumartist/$album %aunique{}/$track $title
+      singleton: Singles/$albumartist/$album %aunique{}/$track $title %aunique{}
+      comp: Compilation/$album %aunique{}/$track $title %aunique{}
+      albumtype:soundtrack: Soundtracks/$album %aunique{}/$track $title %aunique{} 
+    match: 
+      max_rec:
+        missing_tracks: low
+        unmatched_tracks: low
+      strong_rec_thresh: 0.08
+      ignored: missing_tracks unmatched_tracks
+      distance_weights: 
+        source: 0.25 
+
+    lastgenre:
+      auto: yes
+      source: album
+        
+    embedart: 
+      remove_art_file: yes 
+      maxwidth: 0 
+      auto: yes 
+      compare_threshold: 0 
+      ifempty: no 
+
+    fetchart: 
+      auto: yes 
+      minwidth: 0 
+      maxwidth: 0 
+      enforce_ratio: no 
+      cautious: no 
+      cover_names: 
+      - cover 
+      - front 
+      - art 
+      - album 
+      - folder 
+      sources: 
+      - filesystem 
+      - coverart 
+      - itunes 
+      - amazon 
+      - albumart 
+
+    duplicates: 
+      album: no 
+      checksum: '' 
+      copy: '' 
+      count: no 
+      delete: no 
+      format: '' 
+      full: no 
+      keys: [] 
+      merge: no 
+      move: '' 
+      path: no 
+      tiebreak: {} 
+      strict: no 
+      tag: ''
+
+    replaygain:
+      auto: no
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: betanin
+  namespace: betanin
+  labels:
+    app: betanin
+spec:
+  serviceName: "betanin"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: betanin
+  volumeClaimTemplates:
+  - metadata:
+      namespace: betanin
+      name: config
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "gensokyo-mayastor-singleton"
+      resources:
+        requests:
+          storage: 6Gi 
+  template:
+    metadata:
+      labels:
+        app: betanin
+    spec:
+      containers:
+      - name: betanin
+        image: sentriz/betanin:nightly
+        env:
+        - name: UID
+          value: "1000"
+        - name: GID
+          value: "1000"
+        ports:
+        - containerPort: 9393
+        volumeMounts:
+        - name: library-vol
+          mountPath: /music
+        - name: downloads-vol
+          mountPath: /downloads
+        - name: inbox-vol
+          mountPath: /inbox
+        - name: config
+          mountPath: /b/.config/beets
+          subPath: beets
+        - name: config
+          mountPath: /b/.config/betanin
+          subPath: betanin
+        - name: config
+          mountPath: /b/.local/share/betanin
+          subPath: persist
+      initContainers:
+      - name: copy-configs
+        image: busybox
+        command:
+        - /bin/entrypoint.sh
+        volumeMounts:
+        - mountPath: /b/.config
+          name: config
+        - mountPath: /cm/config.yaml
+          name: config-files
+          subPath: config.yaml
+        - mountPath: /cm/config.toml
+          name: config-secret
+          subPath: config.toml
+        - mountPath: /bin/entrypoint.sh
+          name: config-files
+          readOnly: true
+          subPath: entrypoint.sh
+      restartPolicy: Always
+      volumes:
+      - name: config-files
+        configMap:
+          name: betanin-config
+          defaultMode: 0770
+      - name: config-secret
+        secret:
+          secretName: betanin-secret
+          defaultMode: 0770
+      - name: config
+        persistentVolumeClaim:
+          claimName: betanin-config-pvc
+      - name: inbox-vol
+        nfs:
+          server: 10.0.1.10
+          path: /mnt/rust2/media/music/inbox
+      - name: library-vol
+        nfs:
+          server: 10.0.1.10
+          path: /mnt/rust2/media/music/library
+      - name: downloads-vol
+        nfs:
+          server: 10.0.1.10
+          path: /mnt/rust2/torrents/music	

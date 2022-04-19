@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metallb
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: ''
+    namespace: metallb-system
+    server: 'https://kubernetes.default.svc'
+  project: default
+  source:
+    repoURL: 'https://charts.bitnami.com/bitnami'
+    targetRevision: 2.6.2
+    helm:
+      values: |
+        configInline:
+          address-pools:
+          - name: default
+            protocol: layer2
+            addresses:
+            - 10.0.1.100-10.0.1.149
+          - name: pool_ingress
+            protocol: layer2
+            addresses:
+            - 10.0.1.25/32
+            auto-assign: false
+          - name: gameservers
+            protocol: layer2
+            addresses:
+            - 10.0.1.151-10.0.1.160
+            auto-assign: false
+    chart: metallb
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

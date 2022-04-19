@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: betanin
+  namespace: betanin
+spec:
+  selector:
+    app: betanin
+  ports:
+  - port: 9393
+    targetPort: 9393
+  type: ClusterIP

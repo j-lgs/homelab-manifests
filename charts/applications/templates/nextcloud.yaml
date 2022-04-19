@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nextcloud
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://nextcloud.github.io/helm/'
+    targetRevision: 2.13.1
+    helm:
+      values: |-
+        nextcloud:
+          existingSecret:
+            enabled: true
+            secretName: nextcloud
+            usernameKey: admin_username
+            passwordKey: admin_password
+          host: apps.trash-hosting.com
+          configs:
+            fix-https.config.php: |-
+              <?php
+              $CONFIG = array (
+              'overwriteprotocol' => 'https'
+              );
+        persistence:
+          enabled: true
+          storageClass: gensokyo-mayastor-singleton
+        internalDatabase:
+          enabled: false
+        externalDatabase:
+          enabled: true
+          type: mysql
+          host: mysql.database.svc.cluster.local:3306
+          database: mysql_nextcloud
+          existingSecret:
+            enabled: true
+            secretName: nextcloud
+            usernameKey: db_username
+            passwordKey: db_password
+        extraVolumes:
+        - name: hugepages
+          emptyDir:
+            medium: HugePages-2Mi
+        extraVolumeMounts:
+        - name: hugepages
+          mountPath: /dev/hugepages
+        resources:
+          requests:
+            hugepages-2Mi: 500Mi
+            memory: 500Mi
+          limits:
+            hugepages-2Mi: 500Mi
+            memory: 1Gi
+        ingress:
+          enabled: true
+          className: nginx
+          tls:
+          - hosts:
+            - apps.trash-hosting.com
+            secretName: app-cert
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-production
+            nginx.ingress.kubernetes.io/enable-cors: "true"
+            nginx.ingress.kubernetes.io/cors-allow-headers: "X-Forwarded-For"
+          path: /cloud
+    chart: nextcloud
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: applications
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+    - CreateNamespace=true
+

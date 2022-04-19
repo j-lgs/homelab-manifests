@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-db-vaultwarden
+  namespace: database
+spec:
+  template:
+    spec:
+      serviceAccountName: k8s-wait-for
+      initContainers:
+      - name: mysql-wait
+        image: groundnuty/k8s-wait-for:v1.5.1
+        args: 
+        - "pod"
+        - "-lstatefulset.kubernetes.io/pod-name=mysql-0"
+      containers:
+      - name: init-db-vaultwarden
+        image: docker.io/bitnami/mysql:8.0.28-debian-10-r23
+        command:
+        - /bin/run.sh
+        volumeMounts:
+        - mountPath: /bin/run.sh
+          name: hook-scripts
+          readOnly: true
+          subPath: vaultwarden-init.sh
+        - name: db-secret
+          mountPath: /db
+      volumes:
+      - name: hook-scripts
+        configMap:
+          name: hook-scripts
+          deaultMode: 504
+      - name: db-secret
+        secret:
+          secretName: mysql-auth-secret
+          optional: false
+      restartPolicy: Never
+  backoffLimit: 10

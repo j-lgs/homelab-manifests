@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-db-gitea
+  namespace: database
+spec:
+  template:
+    spec:
+      containers:
+      - name: init-db-gitea
+        image: docker.io/bitnami/mysql:8.0.28-debian-10-r23
+        command:
+        - /bin/run.sh
+        volumeMounts:
+        - mountPath: /bin/run.sh
+          name: hook-scripts
+          readOnly: true
+          subPath: gitea-init.sh
+        - name: db-secret
+          mountPath: /db
+      volumes:
+      - name: hook-scripts
+        configMap:
+          name: hook-scripts
+          deaultMode: 504      
+      - name: db-secret
+        secret:
+          secretName: mysql-auth-secret
+          optional: false
+      restartPolicy: Never
+  backoffLimit: 10

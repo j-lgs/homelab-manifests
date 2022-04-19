@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vaultwarden
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://k8s-at-home.com/charts/'
+    targetRevision: 4.1.0
+    helm:
+      values: |-
+        env:
+        - name: SIGNUPS_ALLOWED
+          value: 'false'
+        - name: DOMAIN
+          value: 'https://apps.trash-hosting.com/vaultwarden'
+        - name: ENABLE_DB_WAL
+          value: 'false'
+        envFrom:
+        - secretRef:
+            name: admin-token-secret
+        - secretRef:
+            name: config
+        persistence:
+          config:
+            enabled: true
+            storageClass: gensokyo-mayastor-singleton
+        ingress:
+          main:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-production
+            tls:
+            - hosts:
+              - apps.trash-hosting.com
+              secretName: app-cert
+            hosts:
+            - host: apps.trash-hosting.com
+              paths:
+              - path: /vaultwarden
+                pathType: Prefix
+                service:
+                  port: 80
+              - path: /vaultwarden/notifications/hub/negotiate
+                pathType: Prefix
+                service:
+                  port: 80
+              - path: /vaultwarden/notifications/hub
+                pathType: Prefix
+                service:
+                  port: 3012
+    chart: vaultwarden
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: applications
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+    - CreateNamespace=true
+

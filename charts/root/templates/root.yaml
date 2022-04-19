@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  project: default
+  source:
+    path: charts/root
+    repoURL: http://gitea.apps.gensokyo-cluster.lan/jlgs/homelab-manifests.git
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+       prune: true
+       selfHeal: false

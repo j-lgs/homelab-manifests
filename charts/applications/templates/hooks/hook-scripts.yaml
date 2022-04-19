@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hook-scripts
+  namespace: database
+data:
+  gitea-init.sh: |
+    #!/bin/sh
+    mysql -h $(cat /db/host) -uroot -p\"$(cat /db/mysql-root-password)\" -e\"create database if not exists mysql_gitea character set 'utf8mb4' collate 'utf8mb4_unicode_ci';\";
+  nextcloud-init.sh: |
+    #!/bin/sh
+    mysql -h $(cat /db/host) -uroot -p\"$(cat /db/mysql-root-password)\" -e\"create database if not exists mysql_nextcloud character set 'utf8mb4' collate 'utf8mb4_unicode_ci';\";
+  vaultwarden-init.sh: |
+    #!/bin/sh
+    mysql -h $(cat /db/host) -uroot -p\"$(cat /db/mysql-root-password)\" -e\"create database if not exists mysql_vaultwarden character set 'utf8mb4' collate 'utf8mb4_unicode_ci';\";
+  mysql-init.sh: |
+    #!/bin/sh
+    if [[ $(hostname) == *mysql-0* ]]; then
+      echo "Initialising database user and granting privileges to them."
+      ROOT_PASSWORD=$(cat /db/mysql-root-password)
+                
+      DB_USERNAME=$(cat /db/username)
+      DB_PASSWORD=$(cat /db/password)#
+ 
+      mysql -h $(cat /db/host) -uroot -p"$ROOT_PASSWORD" -e \
+        "create user if not exists '$DB_USERNAME'@'%' identified by '$DB_PASSWORD';";
+      mysql -h $(cat /db/host) -uroot -p"$ROOT_PASSWORD" -e \
+        "grant all privileges on \`${DB_USERNAME}\_%\` . * TO '$DB_USERNAME'@'%';";
+      mysql -h $(cat /db/host) -uroot -p"$ROOT_PASSWORD" -e "flush privileges;";
+    else
+      echo "No master node"
+    fi     

@@ -1,0 +1,8 @@
+apiVersion: "openebs.io/v1alpha1"
+kind: MayastorPool
+metadata:
+  name: pool-on-chireiden-worker-1-1tb-hdd
+  namespace: mayastor
+spec:
+  node: talos-10-0-1-50
+  disks: ["/dev/sdb"]

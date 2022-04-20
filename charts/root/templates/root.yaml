@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     path: charts/root
-    repoURL: http://gitea.apps.gensokyo-cluster.lan/jlgs/homelab-manifests.git
+    repoURL: https://github.com/j-lgs/homelab-manifests.git
     targetRevision: HEAD
   syncPolicy:
     automated:

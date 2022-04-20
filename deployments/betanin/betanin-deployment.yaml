@@ -97,6 +97,36 @@ data:
     replaygain:
       auto: no
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: betanin-headless
+  namespace: betanin
+  labels:
+    app: betanin
+spec:
+  ports:
+  - port: 9393
+    name: web
+  selector:
+    app: betanin
+  clusterIP: None
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: betanin-allow-all
+  namespace: betanin
+spec:
+  podSelector: {}
+  ingress:
+  - {}
+  egress:
+  - {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -105,7 +135,7 @@ metadata:
   labels:
     app: betanin
 spec:
-  serviceName: "betanin"
+  serviceName: "betanin-headless"
   replicas: 1
   selector:
     matchLabels:
@@ -125,16 +155,42 @@ spec:
       labels:
         app: betanin
     spec:
+      terminationGracePeriod: 30
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 1000
       containers:
       - name: betanin
-        image: sentriz/betanin:nightly
+        image: sentriz/betanin:21b0917
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          fsGroupChangePolicy: "OnRootMismatch"
+          readOnlyRootFilesystem: true
+        resources:
+          limits:
+            cpu: "2000m"
+            memory: "512Mi"
+            ephemeral-storage: "128Mi"
+          requests:
+            cpu: "500m"
+            memory: "128Mi"
+            ephemeral-storage: "16Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9393
+          initialDelaySeconds: 5
+          periodSeconds: 5
         env:
         - name: UID
-          value: "1000"
+          value: "10001"
         - name: GID
-          value: "1000"
+          value: "10001"
         ports:
         - containerPort: 9393
+          name: http
         volumeMounts:
         - name: library-vol
           mountPath: /music
@@ -153,7 +209,21 @@ spec:
           subPath: persist
       initContainers:
       - name: copy-configs
-        image: busybox
+        image: busybox:1.35.0
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          fsGroupChangePolicy: "OnRootMismatch"
+          readOnlyRootFilesystem: true
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+            ephemeral-storage: "128Mi"
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+            ephemeral-storage: "16Mi"
         command:
         - /bin/entrypoint.sh
         volumeMounts:

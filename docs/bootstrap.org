@@ -33,11 +33,11 @@
 ***** Provision VMs with terraform
       #+NAME: Terraform Proxmox secrets
       #+BEGIN_SRC sh
-	export PM_API_TOKEN_SECRET="$secret"
-	export PM_API_TOKEN_ID='terraform@pve!terraform'
-	terraform init
-	terraform plan
-        terraform apply
+       export PM_API_TOKEN_SECRET="$secret"
+       export PM_API_TOKEN_ID='terraform@pve!terraform'
+       terraform init
+       terraform plan
+       terraform apply
       #+END_SRC
 ** Kubernetes setup (Load balancer)
    Apply the ansible playbook for provisioning the haproxy load balancer on proxmox.
@@ -52,6 +52,7 @@
      talosctl apply-config --insecure --nodes 10.0.1.31 --file controlplane.yaml
      talosctl apply-config --insecure --nodes 10.0.1.50 --file worker.yaml
    #+END_SRC
+   Patch once controlplane and worker nodes have been installed.
    Bootstrap kubernetes
    #+NAME: Bootstrap kubernetes and get kubeconfig
    #+BEGIN_SRC sh
@@ -62,7 +63,7 @@
 ** Service setup
 *** Bootstrap mayastor
     Notes:
-    On unsuccessful deployment you must recreate the worker nodes.
+    On unsuccessful deployment delete the etcd data dir on the host.
     #+NAME: Boostrap mayastor
     #+BEGIN_SRC sh
       ansible-playbook mayastor-bootstrap.yaml
@@ -82,21 +83,6 @@
     #+BEGIN_SRC: sh
       helm template apps/ | kubectl apply -f -
     #+END_SRC
-
-
-    kubeseal --format=yaml < secrets/gitea/gitea-database-secret.yaml  > apps/templates/secrets/gitea-database-secret.yaml
-    kubeseal --format=yaml < secrets/gitea/gitea-admin-secret.yaml  > apps/templates/secrets/gitea-admin-secret.yaml
-
-    kubeseal --format=yaml < secrets/mysql/gitea-credential-files-secret.yaml  > apps/templates/secrets/gitea-credential-files-secret.yaml
-    kubeseal --format=yaml < secrets/mysql/mysql-credential-files-secret.yaml  > apps/templates/secrets/mysql-credential-files-secret.yaml
-    kubeseal --format=yaml < secrets/mysql/mysql-auth-secret.yaml  > apps/templates/secrets/mysql-auth-secret.yaml
-
-    kubeseal --format=yaml < secrets/democratic-csi/democratic-csi-config-secret.yaml  > apps/templates/secrets/democratic-csi-config-secret.yaml
-
-    kubeseal --format=yaml < secrets/velero/cloud-credentials.yaml  > apps/templates/secrets/cloud-credentials.yaml
-    kubeseal --format=yaml < secrets/minio/minio-access-secret.yaml  > apps/templates/secrets/minio-access-secret.yaml
-
-    helm template apps/ | kubectl apply -f -
 *** Bootstrap mysql
     To get a debug shell enter in this command:
     #+NAME: Debug mysql
@@ -158,7 +144,7 @@
 **** If bootstrapping from scratch (no backups)    
     Add the new temporary origin and push the manifests to the new git repository
     #+BEGIN_SRC sh
-      git remote add origin http://127.0.0.1:3000/ig/homelab-manifests.git
+      git remote add origin http://127.0.0.1:3000/user/homelab-manifests.git
       git push -u origin master
     #+END_SRC
 ** Bootstrap secrets

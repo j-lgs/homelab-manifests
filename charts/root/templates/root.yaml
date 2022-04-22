@@ -1,3 +1,4 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -16,5 +17,5 @@ spec:
     targetRevision: HEAD
   syncPolicy:
     automated:
-       prune: true
-       selfHeal: false
+      prune: true
+      selfHeal: false

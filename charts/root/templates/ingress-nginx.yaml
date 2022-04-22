@@ -1,3 +1,4 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,14 +20,19 @@ spec:
       values: |
         controller:
           config:
-            http-snippet: 'proxy_cache_path /tmp/nginx_images_cache levels=1:2 keys_zone=images-cache:10m max_size=1g inactive=60m use_temp_path=off;'
+            http-snippet: 'proxy_cache_path /tmp/nginx_images_cache
+                                            levels=1:2
+                                            keys_zone=images-cache:10m
+                                            max_size=1g
+                                            inactive=60m
+                                            use_temp_path=off;'
           service:
             annotations:
               metallb.universe.tf/address-pool: pool_ingress
   project: default
   syncPolicy:
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true
     automated:
       prune: true
       selfHeal: false

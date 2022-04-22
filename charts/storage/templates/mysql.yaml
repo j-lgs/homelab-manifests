@@ -1,3 +1,4 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -54,4 +55,3 @@ spec:
       allowEmpty: true
     syncOptions:
     - CreateNamespace=true
-

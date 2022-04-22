@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -148,7 +149,7 @@ spec:
       namespace: betanin
       name: config
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: ["ReadWriteOnce"]
       storageClassName: "gensokyo-mayastor-singleton"
       resources:
         requests:

@@ -33,65 +33,65 @@ data:
       resume: ask
       incremental_skip_later: yes
       timid: no
-      
+
     paths:
       default: Albums/$albumartist/$album %aunique{}/$track $title
       singleton: Singles/$albumartist/$album %aunique{}/$track $title %aunique{}
       comp: Compilation/$album %aunique{}/$track $title %aunique{}
-      albumtype:soundtrack: Soundtracks/$album %aunique{}/$track $title %aunique{} 
-    match: 
+      albumtype:soundtrack: Soundtracks/$album %aunique{}/$track $title %aunique{}
+    match:
       max_rec:
         missing_tracks: low
         unmatched_tracks: low
       strong_rec_thresh: 0.08
       ignored: missing_tracks unmatched_tracks
-      distance_weights: 
-        source: 0.25 
+      distance_weights:
+        source: 0.25
 
     lastgenre:
       auto: yes
       source: album
-        
-    embedart: 
-      remove_art_file: yes 
-      maxwidth: 0 
-      auto: yes 
-      compare_threshold: 0 
-      ifempty: no 
 
-    fetchart: 
-      auto: yes 
-      minwidth: 0 
-      maxwidth: 0 
-      enforce_ratio: no 
-      cautious: no 
-      cover_names: 
-      - cover 
-      - front 
-      - art 
-      - album 
-      - folder 
-      sources: 
-      - filesystem 
-      - coverart 
-      - itunes 
-      - amazon 
-      - albumart 
+    embedart:
+      remove_art_file: yes
+      maxwidth: 0
+      auto: yes
+      compare_threshold: 0
+      ifempty: no
 
-    duplicates: 
-      album: no 
-      checksum: '' 
-      copy: '' 
-      count: no 
-      delete: no 
-      format: '' 
-      full: no 
-      keys: [] 
-      merge: no 
-      move: '' 
-      path: no 
-      tiebreak: {} 
-      strict: no 
+    fetchart:
+      auto: yes
+      minwidth: 0
+      maxwidth: 0
+      enforce_ratio: no
+      cautious: no
+      cover_names:
+      - cover
+      - front
+      - art
+      - album
+      - folder
+      sources:
+      - filesystem
+      - coverart
+      - itunes
+      - amazon
+      - albumart
+
+    duplicates:
+      album: no
+      checksum: ''
+      copy: ''
+      count: no
+      delete: no
+      format: ''
+      full: no
+      keys: []
+      merge: no
+      move: ''
+      path: no
+      tiebreak: {}
+      strict: no
       tag: ''
 
     replaygain:
@@ -134,6 +134,9 @@ metadata:
   namespace: betanin
   labels:
     app: betanin
+  annotations:
+    # Tests must be disabled due to pecularities in the sentriz/betanin docker image.
+    kube-score/ignore: container-security-context-user-group-id,container-security-context-readonlyrootfilesystem
 spec:
   serviceName: "betanin-headless"
   replicas: 1
@@ -149,30 +152,31 @@ spec:
       storageClassName: "gensokyo-mayastor-singleton"
       resources:
         requests:
-          storage: 6Gi 
+          storage: 6Gi
   template:
     metadata:
       labels:
         app: betanin
     spec:
-      terminationGracePeriod: 30
       securityContext:
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 1000
+        fsGroupChangePolicy: "Always"
+        fsGroup: 10001
       containers:
       - name: betanin
         image: sentriz/betanin:21b0917
         imagePullPolicy: Always
         securityContext:
+          # For some reason this container uses sudo and breaks when ran with a UID other than 0.
+          runAsUser: 0
+          runAsGroup: 10001
           allowPrivilegeEscalation: false
-          fsGroupChangePolicy: "OnRootMismatch"
-          readOnlyRootFilesystem: true
+          # Setting to true breaks the container
+          readOnlyRootFilesystem: false
         resources:
           limits:
             cpu: "2000m"
             memory: "512Mi"
-            ephemeral-storage: "128Mi"
+            ephemeral-storage: "512Mi"
           requests:
             cpu: "500m"
             memory: "128Mi"
@@ -212,18 +216,19 @@ spec:
         image: busybox:1.35.0
         imagePullPolicy: Always
         securityContext:
+          runAsUser: 10001
+          runAsGroup: 10001
           allowPrivilegeEscalation: false
-          fsGroupChangePolicy: "OnRootMismatch"
           readOnlyRootFilesystem: true
         resources:
           limits:
-            cpu: "100m"
+            cpu: "500m"
             memory: "64Mi"
-            ephemeral-storage: "128Mi"
+            ephemeral-storage: "512Mi"
           requests:
-            cpu: "50m"
+            cpu: "200m"
             memory: "64Mi"
-            ephemeral-storage: "16Mi"
+            ephemeral-storage: "64Mi"
         command:
         - /bin/entrypoint.sh
         volumeMounts:
@@ -263,4 +268,4 @@ spec:
       - name: downloads-vol
         nfs:
           server: 10.0.1.10
-          path: /mnt/rust2/torrents/music	
+          path: /mnt/rust2/torrents/music

@@ -1,0 +1,55 @@
+---
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  validate-yaml:
+    name: 'yaml-validate'
+    runs-on: 'ubuntu-latest'
+    env:
+      HELM_VERSION: 3.8.2
+      KUBEVAL_VERSION: 0.16.1
+    steps:
+    - name: Clone the repo
+      uses: actions/checkout@v2
+
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9.x
+
+    - name: Get dependencies
+      run: |
+        curl -Ls https://get.helm.sh/helm-v${{ env.HELM_VERSION }}-linux-amd64.tar.gz | \
+          tar -zxvf - linux-amd64/helm \
+            --one-top-level=/usr/local/bin --strip-components=1
+
+        curl -Ls https://github.com/instrumenta/kubeval/releases/download/v${{ env.KUBEVAL_VERSION }}/kubeval-linux-amd64.tar.gz | \
+          tar -zxvf - kubeval \
+            --one-top-level=/usr/local/bin
+
+        pip install yamllint
+
+    - name: Run yamllint
+      run: |
+        yamllint -c .yamllint.yaml .
+
+    - name: Run kubeval
+      run: |
+        kubeval --ignore-missing-schemas -d deployments -i vendor
+        for chart in charts/*; do
+          helm template $chart | kubeval --ignore-missing-schemas - || exit 1
+        done
+
+    - name: Run kube-score
+      uses: docker://zegl/kube-score:v1.14.0-helm3
+      with:
+        entrypoint: /bin/sh
+        args: |
+          -c "for chart in charts/*; do
+                helm template $chart | kube-score score - || exit 1
+              done && kube-score score deployments/*/*.yaml"

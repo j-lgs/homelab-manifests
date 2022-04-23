@@ -1,0 +1,13 @@
+---
+extends: default
+
+ignore: |
+  charts/secrets
+  deployments/mayastor/vendor
+
+rules:
+  line-length:
+    max: 80
+    level: warning
+  indentation:
+    indent-sequences: false

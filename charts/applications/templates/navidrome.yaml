@@ -27,8 +27,8 @@ spec:
             type: custom
             volumeSpec:
               nfs:
-                server: 10.0.1.10
-                path: /mnt/rust2/media/music
+                server: 10.0.1.9
+                path: /rust1/media/music
         ingress:
           main:
             enabled: true

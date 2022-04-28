@@ -13,8 +13,8 @@ spec:
     server: 'https://kubernetes.default.svc'
   project: default
   source:
-    repoURL: 'https://charts.bitnami.com/bitnami'
-    targetRevision: 2.6.2
+    repoURL: 'https://metallb.github.io/metallb'
+    targetRevision: 0.12.1
     helm:
       values: |
         configInline:

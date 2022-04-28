@@ -14,11 +14,6 @@ spec:
         mode: standalone
         existingSecret: minio-access-secret
 
-        persistence:
-          storageClass: freenas-nfs-csi
-          enabled: yes
-          size: 250Gi
-
         resources:
           requests:
             memory: 512Mi

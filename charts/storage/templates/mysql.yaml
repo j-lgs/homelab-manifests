@@ -21,12 +21,6 @@ spec:
         auth:
           existingSecret: mysql-auth-secret
         primary:
-          startupProbe:
-            periodSeconds: 60
-            timeoutSeconds: 360
-            initialDelaySeconds: 360
-            successThreshold: 1
-            failureThreshold: 10
           extraVolumes:
           - name: mysql-credentials
             secret:
